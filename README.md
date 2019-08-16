@@ -1,0 +1,1 @@
+# Master-s-thesis-Prediction-intervals-for-overdispersed-binomial-data
