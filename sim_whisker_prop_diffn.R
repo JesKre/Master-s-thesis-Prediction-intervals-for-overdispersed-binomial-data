@@ -60,6 +60,8 @@ whiskerprop <- function(dat){
   
   limitsIQR<-quantile(prop, probs=c(0.25, 0.75))
   
+  IQR<-IQR(prop)
+  
   lower<-max(max(0, unname(limitsIQR[1])-1.5*IQR), min(prop))
   upper<-max(unname(limitsIQR[2])+1.5*IQR, max(prop))
   
