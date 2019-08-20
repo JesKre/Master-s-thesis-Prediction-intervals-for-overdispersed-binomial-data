@@ -1,12 +1,11 @@
 
 #-------------------------------------------------------------------------------
-#----------------------------- Simple Method: Whisker interval, diff n ---------
+#----------------------------- Simple Method: Mean sd interval, diff n ---------
 #-------------------------------------------------------------------------------
-
-
 
 unlink(".RData")
 unlink(".Rhistory")
+
 
 setwd("G:/Dell - Krepel")
 
@@ -25,6 +24,7 @@ betbin <- function(anzhist, nhist, exprop, phi)
   dat <- data.frame(tumor=y, notumor=x)
   return(dat)
 }
+#
 
 #-------------------------------------------------------------------------------
 
@@ -48,62 +48,69 @@ betbin_diffn <- function(anzhist, nhistmean, exprop, phi)
 
 #-------------------------------------------------------------------------------
 
-# Whisker:
-# Lower limit is either lower IQR limit minus 1.5*IQR or
-# 0 or minimum of data, depending on which is the highest value.
-# Upper limit is either upper IQR limit plus 1.5*IQR or
-# maximum of data, depending on which is the lowest value.
+# Interval:
+# Mean plus/minus standard deviation of the mean 
 
-whiskerprop <- function(dat){
+meansd <- function(dat){
   # Proportion of tumors
   prop<-dat$tumor/(dat$tumor+dat$notumor)
   
-  limitsIQR<-quantile(prop, probs=c(0.25, 0.75))
+  # Expected number of tumors in the the future sample
+  mean<-mean(prop)
   
-  IQR<-IQR(prop)
+  # expected standard deviation
+  sd<-sd(prop) 
   
-  lower<-max(max(0, unname(limitsIQR[1])-1.5*IQR), min(prop))
-  upper<-max(unname(limitsIQR[2])+1.5*IQR, max(prop))
+  # Lower boundary of the interval
+  lower <- mean - sd
   
-  df<-data.frame(lower, upper)
+  # Upper boundary of the interval
+  upper <- mean + sd
   
-  return(df)
+  # Lower limited at 0 
+  if(lower < 0){
+    lower <- 0
+  }
+  
+  msd <- data.frame(lower=lower, upper=upper)
+  
+  return(msd)
 }
-
 
 #-------------------------------------------------------------------------------
 
+# Simulation
 
 predsim <- function(nsim, anzhist, nhistmean, m, exprop, phi) {
   
-  whiskerpropOK <- numeric(length=nsim)
+  meansdOK <- numeric(length=nsim)
   
   for(i in 1:nsim) { 
     dathist <- betbin_diffn(anzhist=anzhist, nhistmean=nhistmean, exprop=exprop, phi=phi)
     datakt <- betbin(anzhist=1, nhist=m, exprop=exprop, phi=phi)
     propakt<-datakt$tumor/(datakt$tumor+datakt$notumor)
     
-    # whiskerprop1
-    PIwhiskerprop <- try(whiskerprop(dat=dathist))
+    # meansd1
+    PImeansd <- try(meansd(dat=dathist))
     
     
-    if(class(PIwhiskerprop)=="try-error")
+    if(class(PImeansd)=="try-error")
     {
-      whiskerpropOK[i] <- NA
+      meansdOK[i] <- NA
     }#
     
     else
     {
-      whiskerpropOK[i] <- (PIwhiskerprop[1]<= propakt & 
-                             propakt<=PIwhiskerprop[2])
+      meansdOK[i] <- (PImeansd[1]<= propakt & 
+                        propakt<=PImeansd[2])
     }#
   }
   #
   
   # Coverage Probabilities
-  cov_whiskerprop <- (sum(whiskerpropOK, na.rm=TRUE)/nsim)
+  cov_meansd <- (sum(meansdOK, na.rm=TRUE)/nsim)
   
-  return(c(whiskerprop=cov_whiskerprop,
+  return(c(meansd=cov_meansd,
            nsim=nsim, 
            anzhist=anzhist, 
            nhistmean=nhistmean, 
@@ -115,8 +122,6 @@ predsim <- function(nsim, anzhist, nhistmean, m, exprop, phi) {
 
 #-------------------------------------------------------------------------------
 
-# Simulation
-
 simdat <- expand.grid(
   anzhist=c(5, 10, 20, 100),
   m=c(10, 30, 50, 100),
@@ -126,19 +131,16 @@ simdat <- expand.grid(
 
 
 system.time(
-  sim_whiskerprop_df <- apply(simdat, MARGIN=1, 
-                           function(x){
-                             predsim(nsim=5000, anzhist=unname(x[1]), m=unname(x[2]),
-                                     nhistmean=unname(x[3]), exprop=unname(x[4]), 
-                                     phi=unname(x[5]))
-                           }) 
+  sim_meansd_df <- apply(simdat, MARGIN=1, 
+                      function(x){
+                        predsim(nsim=5000, anzhist=unname(x[1]), m=unname(x[2]),
+                                nhistmean=unname(x[3]), exprop=unname(x[4]), 
+                                phi=unname(x[5]))
+                      }) 
 )
 
 
-simulation_whiskerprop_df <- data.frame(t(sim_whiskerprop_df))
+simulation_meansd_df <- data.frame(t(sim_meansd_df))
 
-write.csv2(simulation_whiskerprop_df, "coverage_whiskerprop_diffn.csv")
-
-
-#-------------------------------------------------------------------------------
+write.csv2(simulation_meansd_df, "coverage_meansd_prop_diffn.csv")
 
